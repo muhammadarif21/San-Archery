@@ -225,6 +225,11 @@ export async function updateProduct(product) {
     }
 }
 
+export async function updateCustomer(customer) {
+    console.log(customer)
+    await databases.updateDocument(appwriteConfig.databaseId, appwriteConfig.customerCollectionId, customer.$id, {hasPaid: customer.hasPaid});
+}
+
 export async function getProductById(productId) {
     try {
         const product = await databases.getDocument(

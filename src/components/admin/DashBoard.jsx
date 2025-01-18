@@ -1,6 +1,7 @@
-import { useGetAllCustomer } from '@/appwrite/queriesAndMutation';
+import { useGetAllCustomer, useUpdateCustomer } from '@/appwrite/queriesAndMutation';
 import { useAuth } from '@/context/AuthContext';
-import React, { useContext, useEffect } from 'react';
+import axios from 'axios';
+import React, { useContext, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 const Loading = () => (
@@ -46,6 +47,9 @@ const CustomerCard = ({ customer }) => (
 );
 
 const Dashboard = () => {
+    const [filteredHasPaidData, setFilteredHasPaidData] = useState([])
+    const { mutateAsync: updateCustomer } = useUpdateCustomer();
+
     const { data, isLoading, isError } = useGetAllCustomer();
     const navigate = useNavigate();
     const { isLoggedIn, setIsLoggedIn, setEmail } = useAuth();
@@ -66,6 +70,40 @@ const Dashboard = () => {
     if (!isLoggedIn) {
         return null;
     }
+
+    const filterHasPaidData = (data) => {
+        const filteredData = data.documents.filter(doc => doc.hasPaid === true);
+        return filteredData
+    };
+
+    const updateData = (data) => {
+        const updatedData = data.documents.filter(doc => doc.hasPaid === false);
+        updatedData.forEach(element => {
+            checkingCustomer(element)
+        });
+        return updatedData
+    };
+
+    async function checkingCustomer(values) {
+        try {
+            let response = await axios.get(`http://localhost:5000/payment-status/${values.transaction_id}`)
+            let customerData = response.data
+            if (customerData.transaction_status == "settlement") {
+                const customer = {...values, hasPaid: true}
+                const updatedCustomer = await updateCustomer(customer);
+                return updatedCustomer
+            }
+        } catch (error) {
+            console.error("Error submitting form:", error);
+        }
+    }
+
+    useEffect(() => {
+        if (data) {
+            setFilteredHasPaidData(filterHasPaidData(data))
+            updateData(data);
+        }
+    }, [data]);
 
     return (
         <div className='w-full p-4'>
@@ -95,14 +133,14 @@ const Dashboard = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {isLoading ? <Loading /> : isError ? <Error /> : data.documents.map((customer) => (
+                        {isLoading ? <Loading /> : isError ? <Error /> : filteredHasPaidData.map((customer) => (
                             <CustomerRow key={customer.$id} customer={customer} />
                         ))}
                     </tbody>
                 </table>
             </div>
             <div className="grid grid-cols-1 gap-4 md:hidden">
-                {isLoading ? <Loading /> : isError ? <Error /> : data.documents.map((customer) => (
+                {isLoading ? <Loading /> : isError ? <Error /> : filteredHasPaidData.map((customer) => (
                     <CustomerCard key={customer.$id} customer={customer} />
                 ))}
             </div>
