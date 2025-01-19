@@ -22,6 +22,8 @@ const formSchema = z.object({
     pesan: z.string().min(5).max(500),
 })
 
+
+
 export function FormContact() {
     // 1. Define your form.
     const form = useForm({
@@ -35,11 +37,25 @@ export function FormContact() {
     })
 
     // 2. Define a submit handler.
-    function onSubmit(values) {
-        // Do something with the form values.
-        // ✅ This will be type-safe and validated.
-        console.log(values)
+    // 2. Define a submit handler.
+function onSubmit(values) {
+    // Ensure that all required fields are filled
+    const { username, email, phoneNumber, pesan } = values;
+    
+    if (username && email && phoneNumber && pesan) {
+        // Format the message for WhatsApp
+        const whatsappMessage = `*Name:* ${username}\n*Email:* ${email}\n*Phone Number:* ${phoneNumber}\n*Message:* ${pesan}`;
+        
+        // Correctly format the Indonesian phone number (removing the leading 0 and adding +62)
+        const whatsappLink = `https://wa.me/6285893271508?text=${encodeURIComponent(whatsappMessage)}`;
+        
+        // Redirect to WhatsApp
+        window.location.href = whatsappLink;
+    } else {
+        alert("Please fill in all fields.");
     }
+}
+
 
     return (
         <Form {...form}>

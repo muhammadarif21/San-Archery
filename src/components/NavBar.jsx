@@ -144,15 +144,13 @@ const NavBar = ({ setSearchTerm, searchTerm }) => {
         // Menghitung totalPrice untuk setiap item dan juga menghitung total keseluruhan  
         const cartItems = ordered.map(item => {
             const quantity = quantities.find(q => q.imageUrl === item.imageUrl)?.quantity || 1;
-            const totalPrice = shippingCost + (item.price * quantity);
-
-            console.log('Hallo')
             return {
                 product: item.name,
+                price: item.price, // ✅ Tambahkan harga satuan
                 quantity: quantity,
-                totalPrice: totalPrice
+                totalPrice: item.price * quantity // ✅ Kirim harga total
             };
-        });
+        });        
 
         // Buat payload untuk dikirim ke backend  
         const orderPayload = {
