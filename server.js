@@ -23,8 +23,29 @@ client
 const databases = new Databases(client);
 console.log("✅ Appwrite Client Initialized");
 
+app.get('/payment-status/:orderId', async (req, res) => {
+    const orderId = req.params.orderId;
+    const url = `https://api.sandbox.midtrans.com/v2/${orderId}/status`;
+
+    try {
+        const response = await axios.get(url, {
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic U0ItTWlkLXNlcnZlci1wVG55VmRzclBVQmxuRzdtODlNUlFIamQ6', // Your actual server key
+            },
+        });
+
+        res.json(response.data); // Send the Midtrans response back to the frontend
+    } catch (error) {
+        // Log full error details
+        console.error('Error fetching payment status:', error.response || error.message);
+        res.status(500).json({ error: 'Failed to fetch payment status' });
+    }
+});
+
 // ================================
-// 🚀 Endpoint untuk membuat transaksi Midtrans
+// Endpoint untuk membuat transaksi Midtrans
 // ================================
 app.post('/create-transaction', async (req, res) => {
     try {
@@ -34,7 +55,7 @@ app.post('/create-transaction', async (req, res) => {
         console.log("🛍️ Received cartItems:", cartItems);
 
         if (!customerData || !cartItems || cartItems.length === 0) {
-            console.error("❌ Missing customerData or cartItems");
+            console.error("Missing customerData or cartItems");
             return res.status(400).json({ error: "Invalid request data" });
         }
 
@@ -46,7 +67,7 @@ app.post('/create-transaction', async (req, res) => {
 
         let totalItemAmount = cartItems.reduce((acc, item) => acc + (Number(item.totalPrice) || 0), 0);
         if (totalItemAmount <= 0) {
-            console.error("❌ Error: totalItemAmount is invalid:", totalItemAmount);
+            console.error("Error: totalItemAmount is invalid:", totalItemAmount);
             return res.status(400).json({ error: "Invalid total amount" });
         }
 
@@ -95,7 +116,7 @@ app.post('/create-transaction', async (req, res) => {
         res.json({ token: transaction.token, param: parameter });
 
     } catch (error) {
-        console.error("❌ Midtrans Transaction Error:", error);
+        console.error("Midtrans Transaction Error:", error);
         if (!res.headersSent) {
             res.status(500).json({ error: error.message });
         }
@@ -103,14 +124,39 @@ app.post('/create-transaction', async (req, res) => {
 });
 
 // ================================
-// 🚀 Fungsi untuk menyimpan data ke Appwrite
+// Webhook Midtrans untuk menangani notifikasi pembayaran
+// ================================
+app.post('/midtrans-notification', async (req, res) => {
+    try {
+        const notification = req.body;
+        console.log("Midtrans Notification Received:", notification);
+
+        if (notification.transaction_status === "settlement") {
+            await databases.updateDocument(
+                process.env.VITE_DATABASE_ID,
+                process.env.VITE_COLLECTION_ID_CUSTOMER,
+                notification.order_id,
+                { hasPaid: true }
+            );
+            console.log("Payment status updated to paid");
+        }
+
+        res.status(200).send("OK");
+    } catch (error) {
+        console.error("Error updating payment status:", error);
+        res.status(500).send("Error updating payment status");
+    }
+});
+
+// ================================
+// Fungsi untuk menyimpan data ke Appwrite
 // ================================
 async function saveOrder(customerData, cartItems, transaction_id) {
     try {
-        console.log('💾 Saving order with customerData:', customerData);
-        console.log('🛒 Saving order with cartItems:', cartItems);
+        console.log('Saving order with customerData:', customerData);
+        console.log('Saving order with cartItems:', cartItems);
 
-        // ✅ Simpan data customer ke Appwrite
+        // Simpan data customer ke Appwrite
         const customer = await databases.createDocument(
             process.env.VITE_DATABASE_ID,
             process.env.VITE_COLLECTION_ID_CUSTOMER,
@@ -129,9 +175,9 @@ async function saveOrder(customerData, cartItems, transaction_id) {
             }
         );
 
-        console.log("✅ Customer saved successfully:", customer);
+        console.log("Customer saved successfully:", customer);
 
-        // ✅ Simpan data pesanan ke Appwrite
+        // Simpan data pesanan ke Appwrite
         for (const item of cartItems) {
             try {
                 const order = await databases.createDocument(
@@ -148,21 +194,21 @@ async function saveOrder(customerData, cartItems, transaction_id) {
                         'X-Appwrite-Key': process.env.VITE_SECRET_KEY  // ✅ API Key digunakan di headers
                     }
                 );
-                console.log("✅ Order saved successfully:", order);
+                console.log("Order saved successfully:", order);
             } catch (orderError) {
-                console.error('❌ Error saving order item:', orderError.message);
+                console.error('Error saving order item:', orderError.message);
             }
         }
 
-        console.log('✅ Order process completed successfully');
+        console.log('Order process completed successfully');
 
     } catch (error) {
-        console.error('❌ Error saving order:', error.response || error.message);
+        console.error('Error saving order:', error.response || error.message);
     }
 }
 
 // ================================
-// 🚀 Jalankan server
+// Jalankan server
 // ================================
 app.listen(port, () => {
     console.log(`🚀 Server is running on port ${port}`);
